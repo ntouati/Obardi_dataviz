@@ -1,0 +1,333 @@
+---
+title: 'Carte bivariée : Densité de population et coefficient d''incertitude par bailliage'
+author: "N. Touati et V. Gay"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+  pdf_document:
+    toc: true
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(
+  echo = TRUE,
+  warning = FALSE,
+  message = FALSE,
+  fig.width = 10,
+  fig.height = 8
+)
+```
+
+## 1. Installation et chargement des packages
+
+```{r packages}
+# Installation des packages (décommenter si nécessaire)
+# install.packages(c("sf", "dplyr", "ggplot2", "biscale", "cowplot", "plotly"))
+
+library(sf)
+library(dplyr)
+library(ggplot2)
+library(biscale)  # Pour les cartes bivariées
+library(cowplot)  # Pour la légende
+library(tidyr)  # pour replace_na()
+```
+## 2. Chargement des données
+
+```{r load-data}
+# Chargement des shapefiles
+paroisses_sf_pts <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/BAILLIAGES_1789_BRETTE_POINTS.shp")
+
+bailliage_sf <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/BAILLIAGES_1789_BRETTE.shp")
+
+pop_1793 <- read.csv("C:/Users/Najla Touati/Dropbox/Najla - ObARDI/pop_1793.csv")
+
+
+# Jointure 1 : jointure des champs de pop10793 vers paroisses_points
+pop_1793_select <- pop_1793 %>%
+  dplyr::select(noacass, pop_an3_val)
+
+paroisses_pts <- paroisses_sf_pts %>%
+  dplyr::left_join(pop_1793_select, by = "noacass") %>%
+  dplyr::select(
+    noacass,
+    pop_an3_val,
+    geometry
+  )
+
+
+```
+
+## 3. Calcul des variables
+
+### 3.1 Surface des paroisses
+
+```{r surface-paroisses}
+# bascule en polygone paroisses point vers paroisses polygone
+paroisses_bail <- bailliage_sf %>%     # sf POLYGON
+  st_join(
+    paroisses_pts,                      # sf POINT
+    join = st_contains
+  )%>% # Calcul de la surface totale des paroisses en km²
+  mutate(
+    surface_km2 = as.numeric(st_area(geometry)) / 1000000
+  ) 
+```
+
+### 3.2 Agrégation par bailliage
+
+```{r agregation-bailliage}
+# Agrégation des données par bailliage
+bailliage_agr <- paroisses_bail %>%
+  group_by(BAIL_ID) %>%
+  summarise(
+    surface_totale_km2   = sum(surface_km2, na.rm = TRUE),
+    surface_avec_pop_km2 = sum(surface_km2[!is.na(pop_an3_val)], na.rm = TRUE),
+    surface_sans_pop_km2 = sum(surface_km2[ is.na(pop_an3_val)], na.rm = TRUE),
+    population_connue    = sum(pop_an3_val, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(
+    densite_hab_km2 = population_connue / surface_avec_pop_km2,
+    coefficient_incertitude_pct =
+      surface_sans_pop_km2 / surface_totale_km2 * 100
+  )
+
+
+```
+
+**Méthode de calcul :**
+
+- **Surface totale** : somme des surfaces du bailliage
+- **Surface avec pop** : somme des surfaces des paroisses ayant une population renseignée
+- **Surface sans pop** : somme des surfaces des paroisses sans population
+- **Population connue** : somme des populations disponibles
+- **Densité** : population connue ÷ surface avec données
+- **Coefficient d'incertitude (%)** : part de surface sans données par rapport au total
+
+### 3.3 Statistiques descriptives
+
+```{r stats-desc}
+# Affichage des statistiques descriptives
+summary(bailliage_agr %>% st_drop_geometry() %>% 
+          select(densite_hab_km2, coefficient_incertitude_pct))
+```
+
+## 4. Création des classes bivariées
+
+```{r bivariate-classes}
+# Vérification et nettoyage des données
+bailliage_agr2 <- bailliage_agr %>%
+  mutate(
+    densite_hab_km2 = as.numeric(densite_hab_km2),
+    coefficient_incertitude_pct = as.numeric(coefficient_incertitude_pct)
+  )  #%>% filter(!is.na(densite_hab_km2), !is.na(coefficient_incertitude_pct))
+
+# Calcul des bornes de classes sans toucher au sf
+breaks <- bi_class_breaks(
+  bailliage_agr2,
+  x = densite_hab_km2,
+  y = coefficient_incertitude_pct,
+  style = "quantile",
+  dim = 3
+)
+print(breaks)
+
+
+# Création des 9 classes (3x3) avec bi_class
+bailliage_agr2 <- bi_class(
+  bailliage_agr2, 
+  x = densite_hab_km2, 
+  y = coefficient_incertitude_pct,  
+  style = "quantile",  # ou "equal", "quantile"
+  dim = 3,  # grille 3x3
+  na_rm = FALSE
+)
+table(bailliage_agr2$bi_class)
+```
+
+## 5. Définition de la palette de couleurs
+
+```{r palette}
+# # Palette personnalisée (3x3)
+# custom_pal3 <- c(
+# # --- Ligne 1 (Low Y) : Sombre ---
+# "1-1" = "#ff9e6f", # Low X, High Y (clair)
+# "2-1" = "#ff7e5b",  # Mid X, High Y (clair)
+# "3-1" = "#c26052",   # High X, High Y (clair)
+# 
+# # --- Ligne 2 (Mid Y) : Moyen ---
+# "1-2" = "#ffc8c6",  # Low X, Mid Y
+# "2-2" = "#bdabab",  # Mid X, Mid Y
+# "3-2" = "#608197",  # High X, Mid Y
+# 
+# # --- Ligne 3 (High Y) : Clair ---
+# "1-3" = "#f2e1e1",  # Low X, Low Y (sombre)
+# "2-3" = "#a7afc6",  # Mid X, Low Y (sombre)
+# "3-3" = "#5e7fab"  # High X, Low Y (sombre)
+# )
+
+custom_pal3 <- c(
+# --- Ligne 1 (Low Y) : Sombre ---
+"1-1" = "#cadfc8", # Low X, High Y (clair)
+"2-1" = "#b0daaf",  # Mid X, High Y (clair)
+"3-1" = "#7fb27f",   # High X, High Y (clair)
+
+# --- Ligne 2 (Mid Y) : Moyen ---
+"1-2" = "#f5afb2",  # Low X, Mid Y
+"2-2" = "#a58a69",  # Mid X, Mid Y
+"3-2" = "#72652d",  # High X, Mid Y
+
+# --- Ligne 3 (High Y) : Clair ---
+"1-3" = "#e37e7e",  # Low X, Low Y (sombre)
+"2-3" = "#9a582f",  # Mid X, Low Y (sombre)
+"3-3" = "#633008"  # High X, Low Y (sombre)
+
+)
+
+# Aperçu de la palette
+bi_pal(pal = custom_pal3, dim = 3, preview = TRUE)
+
+```
+
+## 6. Visualisation de la carte
+
+### 6.1 Création de la carte principale
+
+```{r carte-principale et carte pour une sortie png }
+map <- ggplot() +
+  geom_sf(
+    data = bailliage_agr2,
+    aes(fill = bi_class),
+    color = NA,
+    linewidth = 0.25,
+    show.legend = FALSE
+  ) +
+  bi_scale_fill(pal = custom_pal3, dim = 3, rotate_pal = TRUE) +
+  labs(
+    title = "Population density and uncertainty coefficient by bailliage",
+    subtitle = "Quantile breaks",
+    caption = "Author: N. Touati and V. Gay | Source: Jean Nicolas Database"
+  ) +
+  bi_theme() +
+  theme(
+    # Titre 
+    plot.title = element_text(
+      size = 64, 
+      face = "bold",
+      colour = "black",
+      hjust = 0.5
+    ),
+    # Sous-titre 
+    plot.subtitle = element_text(
+      size = 58, 
+      face = "italic",
+      colour = "black",
+      hjust = 0.5
+    ),
+    # Caption 
+    plot.caption = element_text(size = 20)
+  )
+
+map_png <- ggplot() +
+  geom_sf(
+    data = bailliage_agr2,
+    aes(fill = bi_class),
+    color = NA,
+    linewidth = 0.05,
+    show.legend = FALSE
+  ) +
+  bi_scale_fill(pal = custom_pal3, dim = 3) +
+  labs(
+    title = "Population density and uncertainty coefficient by bailliage",
+    subtitle = "Quantile breaks",
+    caption = "Author: N. Touati and V. Gay | Source: Jean Nicolas Database"
+  ) +
+  bi_theme() +
+  theme(
+    # Titre 
+    plot.title = element_text(
+      size = 44, 
+      face = "bold",
+      colour = "black",
+      hjust = 0.5
+    ),
+    # Sous-titre 
+    plot.subtitle = element_text(
+      size = 38, 
+      face = "italic",
+      colour = "black",
+      hjust = 0.5
+    ),
+    # Caption 
+    plot.caption = element_text(size = 48)
+  )
+```
+
+### 6.2 Création de la légende bivariée
+
+```{r legende et legend pour impression png}
+legend <- bi_legend(
+  pal = custom_pal3,
+  dim = 3,
+  xlab = "Density(hab/km²)",
+  ylab = "Uncertainty(%)",
+  rotate_pal = TRUE,
+  size = 6 # Taille des carrés de la légende 
+) +
+  theme(
+    axis.title.y = element_text(size = 46, face = "bold", margin = margin(t = 8)),
+    axis.title.x = element_text(size = 46, face = "bold", margin = margin(r = 8))
+  )
+
+legend_png <- bi_legend(
+  pal = custom_pal3,
+  dim = 3,
+  xlab = "Density(hab/km²)",
+  ylab = "Uncertainty(%)",
+  size = 6 # Taille des carrés de la légende 
+) +
+  theme(
+    axis.title.x = element_text(size = 12, face = "bold", margin = margin(t = 8)),
+    axis.title.y = element_text(size = 12, face = "bold", margin = margin(r = 8))
+  )
+```
+
+### 6.3 Combinaison carte + légende
+
+```{r carte-finale, fig.width=75, fig.height=55, out.width="100%", out.height="100%"}
+#  configuration pour sortie png
+finalPlotPng <- ggdraw() +
+  draw_plot(map_png, 0, 0, 1, 1) +
+  draw_plot(legend_png, 0.05, 0.75, 0.2, 0.2)
+
+finalPlot <- ggdraw() +
+  draw_plot(map, 0, 0, 1, 1) +
+  draw_plot(legend, 0.05, 0.75, 0.2, 0.2)
+print(finalPlot)
+
+```
+
+## 7. Sauvegarde de la carte
+
+```{r save-plot, eval=FALSE}
+st_write(
+  bailliage_agr2,
+  dsn   = "C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/bailliage_test2.gpkg", layer = "densite_bivarie",
+  driver = "GPKG", delete_dsn = TRUE
+)
+
+ggsave(
+  "bivariate_map_ajustee2.png",
+  plot = finalPlotPng, 
+  width = 2000/100, # 10 pouces
+  height = 1500/100, # 7.5 pouces
+  dpi = 300,        # Résolution
+  bg = "white"
+)
+
+```
+
