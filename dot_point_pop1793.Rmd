@@ -24,7 +24,7 @@ knitr::opts_chunk$set(
 
 # Carte par Points (Dot Density Map) de la Population par bailliage en 1793
 
-Ce notebook génère une carte par points pour visualiser la répartition de la population connue des bailliages en 1793, en utilisant les packages `sf`, `dplyr`, et `ggplot2`.
+Ce notebook génère une carte par points pour visualiser la répartition de la population connue des bailliages en 1793.
 
 ------------------------------------------------------------------------
 
@@ -34,22 +34,20 @@ library(dplyr)
 library(ggplot2)
 library(tidyr)
 library(packcircles)
-
+library(here)
 ```
 ## 1. Préparation des données
 ```{r load-data}
+
 # Chargement des shapefiles
-# Chargement des shapefiles
-paroisses_sf_pts <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/BAILLIAGES_1789_BRETTE_POINTS.shp")
+paroisses_sf_pts <- st_read(here("data", "BAILLIAGES_1789_BRETTE_POINTS.shp"), quiet = TRUE)
 
-bailliage_sf <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/BAILLIAGES_1789_BRETTE.shp")
+bailliage_sf <- st_read(here("data", "BAILLIAGES_1789_BRETTE.shp"), quiet = TRUE)
 
-pop_1793 <- read.csv("C:/Users/Najla Touati/Dropbox/Najla - ObARDI/pop_1793.csv")
+pop_1793 <- read.csv(here("data", "pop_1793.csv"))
 
-communes_sf <-st_read("C:/Users/Najla Touati/Dropbox/Najla - ObARDI/bailliages 1789/dataverse/Communes/COMMUNES_BRETTE.shp")
+communes_sf <-st_read(here("data", "COMMUNES_BRETTE.shp"), quiet = TRUE)
 
-# paroisses <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/bailliages/COMMUNES_1789_BRETTE_polyg.shp")
-# bailliage <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/bailliages/BAILLIAGES_1789_BRETTE_polyg.shp")
 ```
 ## 2. Calculs des variables
 ```{r calculs des variables}
@@ -141,16 +139,10 @@ circles_sf <- st_as_sf(circles)
 # #Export en geopackage
 # st_write(
 #   dots_sf,
-#   dsn   = "C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/dots.gpkg", layer = "dots",
-#   driver = "GPKG"
-# )
-# # Export en geopackage
-# st_write(
-#   circles_sf,
-#   dsn   = "C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/dots.gpkg",layer = "circles",
-#   driver = "GPKG"
-# )
-# # 
+#   dsn        = here("data", "bailliage_dens.gpkg"), 
+#   layer      = "dots_pts",
+#   driver     = "GPKG", 
+#   delete_dsn = TRUE)
 
 ```
 
@@ -326,8 +318,13 @@ map_dorling
 ###  3.3 Export de la carte en png
 ```{r}
 # === EXPORT PNG ===
-ggsave("C:/Users/Najla Touati/Dropbox/Najla - ObARDI/scriptR/carte_dorling_bailliage_1793.png",
-       plot = map_dorling, width = 2000/200, height = 1500/200, dpi = 300)
+ggsave(
+  "carte_dorling_bailliage_1793.png",
+  plot = map_dorling, 
+  width = 2000/200,
+  height = 1500/200,
+  dpi = 300,        # Résolution
+  bg = "white")
 
 ```
 

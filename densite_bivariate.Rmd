@@ -25,26 +25,26 @@ knitr::opts_chunk$set(
 ## 1. Installation et chargement des packages
 
 ```{r packages}
-# Installation des packages (décommenter si nécessaire)
-# install.packages(c("sf", "dplyr", "ggplot2", "biscale", "cowplot", "plotly"))
+# Appel des packages 
 
 library(sf)
 library(dplyr)
 library(ggplot2)
 library(biscale)  # Pour les cartes bivariées
 library(cowplot)  # Pour la légende
-library(tidyr)  # pour replace_na()
+library(tidyr)  
+library(here)
 ```
+
 ## 2. Chargement des données
 
 ```{r load-data}
 # Chargement des shapefiles
-paroisses_sf_pts <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/BAILLIAGES_1789_BRETTE_POINTS.shp")
+paroisses_sf_pts <- st_read(here("data", "BAILLIAGES_1789_BRETTE_POINTS.shp"), quiet = TRUE)
 
-bailliage_sf <- st_read("C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/BAILLIAGES_1789_BRETTE.shp")
+bailliage_sf <- st_read(here("data", "BAILLIAGES_1789_BRETTE.shp"), quiet = TRUE)
 
-pop_1793 <- read.csv("C:/Users/Najla Touati/Dropbox/Najla - ObARDI/pop_1793.csv")
-
+pop_1793 <- read.csv(here("data", "pop_1793.csv"))
 
 # Jointure 1 : jointure des champs de pop10793 vers paroisses_points
 pop_1793_select <- pop_1793 %>%
@@ -316,8 +316,10 @@ print(finalPlot)
 ```{r save-plot, eval=FALSE}
 st_write(
   bailliage_agr2,
-  dsn   = "C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/data_bivarie_map/bailliage_test2.gpkg", layer = "densite_bivarie",
-  driver = "GPKG", delete_dsn = TRUE
+  dsn        = here("data", "bailliage_dens.gpkg"), 
+  layer      = "densite_bivarie",
+  driver     = "GPKG", 
+  delete_dsn = TRUE
 )
 
 ggsave(

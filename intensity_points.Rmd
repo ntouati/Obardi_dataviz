@@ -30,6 +30,7 @@ library(janitor)
 library(stringr)
 library(leaflet)
 library(viridis)
+library(here)
 ```
 
 # 2. Préparation des données
@@ -38,7 +39,7 @@ library(viridis)
 
 ```{r load-data}
 # Chargement des données 
-rebellions_csv <- read.csv("C:/Users/Najla Touati/Dropbox/Najla - ObARDI/Dynamiques de la révolte/shapefiles/REBELLIONS/rebellions_farines.csv")
+rebellions_csv <- read.csv(here("data", "rebellions_farines.csv"))
 
 # Convertir en objet sf (projection Lambert-93)
 rebellions_sf <- st_as_sf(
@@ -204,7 +205,6 @@ leaflet(
   )
 ```
 
-```
 
 # 7. Export des données
 
@@ -212,8 +212,10 @@ leaflet(
 # Export en geopackage
 st_write(
   rebellions_intensity_filtr,
-  dsn = "C:/Users/Najla Touati/Dropbox/temporaire/obardi_R/data/bailliages/rebellions_intensity.gpkg",
+  dsn = here("data", "bailliage_dens.gpkg"),
+  layer = "intensity",
   driver = "GPKG"
 )
+
 ```
 
