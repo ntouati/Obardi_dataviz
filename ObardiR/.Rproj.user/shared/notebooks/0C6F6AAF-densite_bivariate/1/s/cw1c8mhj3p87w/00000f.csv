@@ -1,0 +1,5 @@
+"0","# Chargement des shapefiles
+paroisses_sf_pts <- st_read(here(""data"", ""data_bivarie_map"", ""BAILLIAGES_1789_BRETTE_POINTS.shp""), quiet = TRUE)
+"
+"2","Erreur : Cannot open ""D:/Github/Obardi_dataviz/data/data_bivarie_map/BAILLIAGES_1789_BRETTE_POINTS.shp""; The file doesn't seem to exist.
+"
