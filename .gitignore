@@ -4,3 +4,4 @@ data/
 # Ignorer les fichiers temporaires de R
 .Rhistory
 .RData
+.Rproj.user
